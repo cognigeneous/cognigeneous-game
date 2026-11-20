@@ -15,13 +15,14 @@ import {
   SURFACE_ROW,
   TILE,
   SOLAR_RATE,
+  HOLD_CAPACITY_G,
   HUD_TITLE,
   HUD_FONT,
   HUD_LINE,
   TOAST_FONT,
   TOAST_FONT_STRONG,
 } from "./config.js";
-import { listHeld, totalCount } from "./data/elements.js";
+import { holdMass, listHeld } from "./data/elements.js";
 
 function setFont(ctx, size, bold) {
   ctx.font = (bold ? "bold " : "") + size + "px " + FONT;
@@ -436,9 +437,12 @@ function drawCountList(ctx, x, y, counts, maxY, discovered) {
     if (y + HUD_LINE > maxY) break;
     const row = rows[i];
     const known = discovered && discovered[row.symbol];
+    const grams = Math.round(row.count * row.molarMass * 100) / 100;
     ctx.fillStyle = "#ffffff";
     ctx.fillText(
-      known ? row.symbol + "  ×" + row.count + "   " + row.name : "?  ×" + row.count,
+      known
+        ? row.symbol + "  " + row.count + " mol  " + grams.toFixed(2) + " g"
+        : "? " + row.count + " mol",
       x,
       y
     );
@@ -490,6 +494,23 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   ctx.strokeRect(left + 1, y + 1, inner - 2, 20);
   y += 30;
 
+  const cargoG = holdMass(state.cargo);
+  const capacity = state.holdCapacityG || HOLD_CAPACITY_G;
+  setFont(ctx, HUD_FONT, true);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.fillText("Cargo: " + cargoG.toFixed(2) + " / " + capacity + " g", left, y);
+  y += HUD_LINE - 4;
+  ctx.fillStyle = "#2a2a2a";
+  ctx.fillRect(left, y, inner, 22);
+  const cargoRatio = clamp(cargoG / capacity, 0, 1);
+  ctx.fillStyle = COLOR.cargo;
+  ctx.fillRect(left, y, Math.round(inner * cargoRatio), 22);
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(left + 1, y + 1, inner - 2, 20);
+  y += 30;
+
   const baseN = Math.max(0, Math.min(state.baseEnergyMax, Math.floor(state.baseEnergy + 1e-4)));
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
@@ -502,8 +523,6 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
 
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("Cargo  " + totalCount(state.cargo) + " / " + state.cargoMax, left, y);
-  y += HUD_LINE;
   ctx.fillText("Silicate: " + state.silicate.toFixed(2), left, y);
   y += HUD_LINE;
   ctx.fillText("Silicate banked: " + state.silicateBanked.toFixed(2), left, y);

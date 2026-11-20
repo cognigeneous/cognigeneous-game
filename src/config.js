@@ -19,7 +19,7 @@ export const PLAYER_W = 22;
 export const PLAYER_H = 30;
 
 export const MAX_FUEL = 100;
-export const CARGO_MAX = 8;
+export const HOLD_CAPACITY_G = 1000;
 
 // Low gravity, strong thrust. Fall speed is capped so landings stay gentle.
 export const GRAVITY = 260;
@@ -55,6 +55,8 @@ export const TOAST_FONT_STRONG = 24;
 export const MOVE_BURN = 3.2;
 export const THRUST_BURN = 7;
 export const DIG_BURN = 3.5;
+// Plain gray rock spends this fraction of DIG_BURN. Ore and hard rock stay at 1.
+export const ROCK_DIG_FUEL_MULT = 0.1;
 
 // Seconds of contact to break one tile.
 export const DIG_TIME = {
@@ -99,6 +101,7 @@ export const COLOR = {
   fuelOk: "#009E73",
   fuelMid: "#F0E442",
   fuelLow: "#D55E00",
+  cargo: "#56B4E9",
 };
 
 // Fill and ink for each element. A missing entry still draws the symbol.
