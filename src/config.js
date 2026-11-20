@@ -21,15 +21,33 @@ export const PLAYER_H = 30;
 export const MAX_FUEL = 100;
 export const CARGO_MAX = 8;
 
-export const GRAVITY = 1700;
-export const DOWN_BOOST = 1400;
+// Low gravity, strong thrust. Fall speed is capped so landings stay gentle.
+export const GRAVITY = 260;
+export const DOWN_BOOST = 80;
 export const MOVE_ACCEL = 5200;
 export const MAX_RUN = 230;
-export const THRUST = 3100;
-export const MAX_FALL = 520;
-export const MAX_RISE = 260;
+export const THRUST = 2600;
+export const MAX_FALL = 140;
+export const MAX_RISE = 480;
 export const GROUND_DRAG = 34;
 export const AIR_DRAG = 18;
+
+// Base battery and the orbital panels that trickle it back.
+export const BASE_ENERGY_MAX = 600;
+export const PAD_TRANSFER_RATE = 25;
+export const SOLAR_RATE = 2;
+
+// Later shop upgrades. airDrill lets Left/Right dig while airborne.
+export const UPGRADES = {
+  airDrill: false,
+};
+
+export const MESSAGE_TIME = 3;
+export const HUD_TITLE = 28;
+export const HUD_FONT = 20;
+export const HUD_LINE = 28;
+export const TOAST_FONT = 20;
+export const TOAST_FONT_STRONG = 24;
 
 // Per second. Sitting still and falling do not burn fuel.
 export const MOVE_BURN = 3.2;
