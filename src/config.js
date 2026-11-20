@@ -54,12 +54,11 @@ export const MOVE_BURN = 3.2;
 export const THRUST_BURN = 7;
 export const DIG_BURN = 3.5;
 
-// Seconds of contact to break a tile. Hard rock is the slow one.
-// Plain gray rock is 1.75x the old 0.12s. Ore is 2x the old 0.2s.
+// Seconds of contact to break one tile.
 export const DIG_TIME = {
-  dirt: 0.21,
-  hard: 0.38,
-  ore: 0.4,
+  dirt: 0.5,
+  hard: 0.8,
+  ore: 0.9,
 };
 
 // Gray rock only. 100 blocks bank into one silicate block.
