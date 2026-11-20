@@ -384,7 +384,8 @@ function drawToast(ctx, state, viewW, viewH) {
   if (state.status === "stranded" || state.messageT <= 0 || !state.message) return;
   const strong =
     state.message.indexOf("Element identified") === 0 ||
-    state.message.indexOf("Delivered") === 0;
+    state.message.indexOf("Delivered") === 0 ||
+    state.message.indexOf("Silicate block") === 0;
   const size = strong ? TOAST_FONT_STRONG : TOAST_FONT;
   ctx.font = "bold " + size + "px " + FONT;
   const width = Math.min(viewW - 24, Math.ceil(ctx.measureText(state.message).width + 36));
@@ -502,6 +503,12 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
   ctx.fillText("Cargo  " + totalCount(state.cargo) + " / " + state.cargoMax, left, y);
+  y += HUD_LINE;
+  ctx.fillText("Silicate: " + state.silicate.toFixed(2), left, y);
+  y += HUD_LINE;
+  ctx.fillText("Silicate banked: " + state.silicateBanked.toFixed(2), left, y);
+  y += HUD_LINE;
+  ctx.fillText("Silicate blocks: " + state.silicateBlocks, left, y);
   y += HUD_LINE;
   ctx.fillText("Depth  " + state.depth + " m", left, y);
   y += HUD_LINE + 4;

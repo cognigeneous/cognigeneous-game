@@ -35,7 +35,7 @@ export const AIR_DRAG = 18;
 // Base battery and the orbital panels that trickle it back.
 export const BASE_ENERGY_MAX = 600;
 export const PAD_TRANSFER_RATE = 25;
-export const SOLAR_RATE = 2;
+export const SOLAR_RATE = 0.5;
 
 // Later shop upgrades. airDrill lets Left/Right dig while airborne.
 export const UPGRADES = {
@@ -55,11 +55,16 @@ export const THRUST_BURN = 7;
 export const DIG_BURN = 3.5;
 
 // Seconds of contact to break a tile. Hard rock is the slow one.
+// Plain gray rock is 1.75x the old 0.12s. Ore is 2x the old 0.2s.
 export const DIG_TIME = {
-  dirt: 0.12,
+  dirt: 0.21,
   hard: 0.38,
-  ore: 0.2,
+  ore: 0.4,
 };
+
+// Gray rock only. 100 blocks bank into one silicate block.
+export const SILICATE_PER_ROCK = 0.01;
+export const SILICATE_PER_BLOCK = 1;
 
 export const FONT =
   'system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';

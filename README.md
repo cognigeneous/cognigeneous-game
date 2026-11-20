@@ -15,7 +15,8 @@ Arrow keys or W A S D. The same keys do both jobs:
 - Up thrusts. Climbing is quick. Falling is slow. The pod cannot dig upward.
 - Sitting still and falling do not use fuel. Thrusters, sideways driving, and digging do.
 - Ore starts unidentified: a color, a shape that is different for each element, and a question mark. The first time you dig an element, it is identified and every cell of that element shows its symbol. The hold has 8 slots.
-- The green PAD unloads cargo immediately and charges the pod from the base energy store. Solar panels refill that store slowly. If the store is empty, the panels have to recharge it before the pod can fill up.
+- The green PAD unloads cargo immediately and charges the pod from the base energy store. Solar panels refill that store at half a unit per second. If the store is empty, the panels have to recharge it before the pod can fill up.
+- Each plain gray block adds a little silicate matter on the pod. It does not take a cargo slot. The pad banks it. Every full 1.00 becomes one silicate block kept at the base.
 - At 0 fuel away from the pad, the pod is stranded. Press R to restart the same map.
 
 The map is built from a fixed seed, so a reload is the same asteroid.

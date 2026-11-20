@@ -22,6 +22,8 @@ import {
   SOLAR_RATE,
   UPGRADES,
   MESSAGE_TIME,
+  SILICATE_PER_ROCK,
+  SILICATE_PER_BLOCK,
 } from "./config.js";
 import { elementBySymbol, ELEMENTS, totalCount } from "./data/elements.js";
 import {
@@ -47,6 +49,9 @@ export function newRun() {
     cargo: {},
     cargoMax: CARGO_MAX,
     delivered: {},
+    silicate: 0,
+    silicateBanked: 0,
+    silicateBlocks: 0,
     status: "playing",
     depth: 0,
     time: 0,
@@ -326,6 +331,8 @@ function finishDig(state, tile) {
       state.message = "Collected " + info.name + " (" + info.symbol + ")";
       state.messageT = MESSAGE_TIME;
     }
+  } else if (tile.t === "dirt") {
+    state.silicate = round2(state.silicate + SILICATE_PER_ROCK);
   }
   spray(state, dig.tx, dig.ty, tile.t, tile.el, 8, 90);
   tile.t = "empty";
@@ -389,6 +396,23 @@ function updateDig(state, keys, dt) {
 function note(state, text) {
   state.message = text;
   state.messageT = MESSAGE_TIME;
+}
+
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
+// Move carried silicate into the base, then turn each full unit into a block.
+function bankSilicate(state) {
+  if (state.silicate > 0) {
+    state.silicateBanked = round2(state.silicateBanked + state.silicate);
+    state.silicate = 0;
+  }
+  const formed = Math.floor(state.silicateBanked / SILICATE_PER_BLOCK + 1e-9);
+  if (formed < 1) return 0;
+  state.silicateBlocks += formed;
+  state.silicateBanked = round2(state.silicateBanked - formed * SILICATE_PER_BLOCK);
+  return formed;
 }
 
 // Panels always trickle in. The pad moves store energy into the pod while docked.
@@ -493,11 +517,16 @@ export function step(state, keys, dt) {
   // Later slice: open the shop from this dock. Cargo unloads at once.
   // Pod fuel comes out of the base store at PAD_TRANSFER_RATE.
   let unloaded = 0;
-  if (docked) unloaded = bankCargo(state);
+  let formed = 0;
+  if (docked) {
+    unloaded = bankCargo(state);
+    formed = bankSilicate(state);
+  }
   tickEnergy(state, docked, dt);
   if (unloaded > 0) {
     note(state, unloaded === 1 ? "Delivered 1 ore." : "Delivered " + unloaded + " ores.");
   }
+  if (formed > 0) note(state, "Silicate block formed!");
   state.wasDocked = docked;
 
   if (state.fuel <= 0 && !docked) {
