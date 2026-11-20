@@ -133,18 +133,76 @@ function drawPad(ctx, sx, sy) {
   ctx.fillRect(sx, sy + 28, TILE, 5);
 }
 
-function drawOre(ctx, tile, sx, sy) {
+// A different shape for each element, so an unidentified ore is not color-only.
+function drawOreMark(ctx, symbol, sx, sy) {
+  const cx = sx + TILE / 2;
+  const cy = sy + TILE / 2;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (symbol === "Al") {
+    ctx.arc(cx, cy, 15, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (symbol === "Fe") {
+    ctx.strokeRect(sx + 6.5, sy + 6.5, TILE - 13, TILE - 13);
+  } else if (symbol === "Ca") {
+    ctx.moveTo(cx, sy + 6);
+    ctx.lineTo(sx + TILE - 7, sy + TILE - 7);
+    ctx.lineTo(sx + 7, sy + TILE - 7);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (symbol === "Na") {
+    ctx.moveTo(cx, sy + 5);
+    ctx.lineTo(sx + TILE - 6, cy);
+    ctx.lineTo(cx, sy + TILE - 5);
+    ctx.lineTo(sx + 6, cy);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (symbol === "Mg") {
+    ctx.moveTo(cx, sy + 6);
+    ctx.lineTo(cx, sy + 13);
+    ctx.moveTo(cx, sy + TILE - 13);
+    ctx.lineTo(cx, sy + TILE - 6);
+    ctx.moveTo(sx + 6, cy);
+    ctx.lineTo(sx + 13, cy);
+    ctx.moveTo(sx + TILE - 13, cy);
+    ctx.lineTo(sx + TILE - 6, cy);
+    ctx.stroke();
+  } else if (symbol === "K") {
+    ctx.moveTo(sx + 7, sy + 9);
+    ctx.lineTo(sx + TILE - 7, sy + 9);
+    ctx.moveTo(sx + 7, sy + TILE - 9);
+    ctx.lineTo(sx + TILE - 7, sy + TILE - 9);
+    ctx.stroke();
+  } else if (symbol === "S") {
+    ctx.fillRect(sx + 7, sy + 7, 5, 5);
+    ctx.fillRect(sx + TILE - 12, sy + 7, 5, 5);
+    ctx.fillRect(sx + 7, sy + TILE - 12, 5, 5);
+    ctx.fillRect(sx + TILE - 12, sy + TILE - 12, 5, 5);
+  } else {
+    ctx.moveTo(sx + 7, sy + 7);
+    ctx.lineTo(sx + 15, sy + 15);
+    ctx.moveTo(sx + TILE - 7, sy + 7);
+    ctx.lineTo(sx + TILE - 15, sy + 15);
+    ctx.moveTo(sx + 7, sy + TILE - 7);
+    ctx.lineTo(sx + 15, sy + TILE - 15);
+    ctx.moveTo(sx + TILE - 7, sy + TILE - 7);
+    ctx.lineTo(sx + TILE - 15, sy + TILE - 15);
+    ctx.stroke();
+  }
+}
+
+function drawOre(ctx, tile, sx, sy, known) {
   const style = ORE_STYLE[tile.el] || { fill: "#888888", ink: "#000000" };
   ctx.fillStyle = style.fill;
   ctx.fillRect(sx + 1, sy + 1, TILE - 2, TILE - 2);
   ctx.strokeStyle = style.ink;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(sx + 4.5, sy + 4.5, TILE - 9, TILE - 9);
+  ctx.fillStyle = style.ink;
+  drawOreMark(ctx, tile.el, sx, sy);
   ctx.fillStyle = style.ink;
   ctx.font = "bold 18px " + FONT;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(tile.el, sx + TILE / 2, sy + TILE / 2 + 1);
+  ctx.fillText(known ? tile.el : "?", sx + TILE / 2, sy + TILE / 2 + 1);
 }
 
 function drawCracks(ctx, sx, sy, progress, ink) {
@@ -192,7 +250,9 @@ function drawTiles(ctx, state, camX, camY, viewW, viewH) {
       else if (tile.t === "bedrock") drawBedrock(ctx, x, y, sx, sy);
       else if (tile.t === "base") drawBaseTile(ctx, x, y, sx, sy);
       else if (tile.t === "pad") drawPad(ctx, sx, sy);
-      else if (tile.t === "ore") drawOre(ctx, tile, sx, sy);
+      else if (tile.t === "ore") {
+        drawOre(ctx, tile, sx, sy, !!(state.discovered && state.discovered[tile.el]));
+      }
       if (state.dig && state.dig.tx === x && state.dig.ty === y && state.dig.p > 0) {
         drawCracks(ctx, sx, sy, state.dig.p, crackInk(tile));
       }
@@ -316,19 +376,21 @@ function drawPod(ctx, state, camX, camY) {
 
 function drawToast(ctx, state, viewW, viewH) {
   if (state.status === "stranded" || state.messageT <= 0 || !state.message) return;
-  ctx.font = "16px " + FONT;
+  const identified = state.message.indexOf("Element identified") === 0;
+  ctx.font = (identified ? "bold 18px " : "16px ") + FONT;
   const width = Math.min(viewW - 24, Math.ceil(ctx.measureText(state.message).width + 28));
+  const height = identified ? 44 : 36;
   const bx = Math.round((viewW - width) / 2);
   const by = 14;
   ctx.fillStyle = COLOR.hud;
-  ctx.fillRect(bx, by, width, 36);
+  ctx.fillRect(bx, by, width, height);
   ctx.strokeStyle = COLOR.hudLine;
   ctx.lineWidth = 2;
-  ctx.strokeRect(bx + 1, by + 1, width - 2, 34);
-  setFont(ctx, 16, false);
+  ctx.strokeRect(bx + 1, by + 1, width - 2, height - 2);
+  setFont(ctx, identified ? 18 : 16, identified);
   ctx.fillStyle = COLOR.text;
   ctx.textAlign = "center";
-  ctx.fillText(state.message, Math.round(viewW / 2), by + 9);
+  ctx.fillText(state.message, Math.round(viewW / 2), by + (identified ? 12 : 9));
 }
 
 function drawStranded(ctx, viewW, viewH) {
@@ -352,7 +414,7 @@ function drawStranded(ctx, viewW, viewH) {
   ctx.fillText("Press R to restart the run.", viewW / 2, y + 142);
 }
 
-function drawCountList(ctx, x, y, counts, maxY) {
+function drawCountList(ctx, x, y, counts, maxY, discovered) {
   const rows = listHeld(counts);
   setFont(ctx, 16, false);
   if (!rows.length) {
@@ -363,8 +425,13 @@ function drawCountList(ctx, x, y, counts, maxY) {
   for (let i = 0; i < rows.length; i++) {
     if (y + 22 > maxY) break;
     const row = rows[i];
+    const known = discovered && discovered[row.symbol];
     ctx.fillStyle = COLOR.text;
-    ctx.fillText(row.symbol + "  ×" + row.count + "   " + row.name, x, y);
+    ctx.fillText(
+      known ? row.symbol + "  ×" + row.count + "   " + row.name : "?  ×" + row.count,
+      x,
+      y
+    );
     y += 22;
   }
   return y;
@@ -437,14 +504,14 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   ctx.fillStyle = COLOR.text;
   ctx.fillText("In the hold", left, y);
   y += 24;
-  y = drawCountList(ctx, left, y, state.cargo, listBottom);
+  y = drawCountList(ctx, left, y, state.cargo, listBottom, state.discovered);
   y += 8;
   if (y + 24 < listBottom) {
     setFont(ctx, 16, true);
     ctx.fillStyle = COLOR.text;
     ctx.fillText("Delivered", left, y);
     y += 24;
-    drawCountList(ctx, left, y, state.delivered, listBottom);
+    drawCountList(ctx, left, y, state.delivered, listBottom, state.discovered);
   }
 
   let cy = controlsTop;

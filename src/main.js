@@ -1,6 +1,6 @@
 // Startup, frame loop, and the screen-reader mirror of the HUD.
 import { GAME_TITLE, MAX_FUEL } from "./config.js";
-import { listHeld } from "./data/elements.js";
+import { ELEMENTS, elementBySymbol, listHeld } from "./data/elements.js";
 import { createGame } from "./game.js";
 import { draw } from "./draw.js";
 
@@ -16,7 +16,7 @@ const game = createGame();
 const intro =
   GAME_TITLE +
   ". Arrow keys or W A S D. Up thrusts. Left and right move and dig. Down digs. Up does not dig. " +
-  "Land on the pad to refuel and unload cargo. Press R to restart.";
+  "Unknown ore shows a question mark until you dig it. Land on the pad to refuel and unload. Press R to restart.";
 
 let cssW = 1;
 let cssH = 1;
@@ -33,12 +33,21 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-function countKey(counts) {
+function countKey(counts, discovered) {
   return listHeld(counts)
     .map(function (row) {
-      return row.symbol + " " + row.count;
+      if (discovered && discovered[row.symbol]) return row.symbol + " " + row.count;
+      return "? " + row.count;
     })
     .join(", ");
+}
+
+function knownKey(discovered) {
+  let key = "";
+  for (let i = 0; i < ELEMENTS.length; i++) {
+    if (discovered[ELEMENTS[i].symbol]) key += ELEMENTS[i].symbol + ",";
+  }
+  return key;
 }
 
 function fuelBucket(fuel) {
@@ -54,6 +63,7 @@ const seen = {
   status: "",
   cargo: "",
   delivered: "",
+  known: "",
   bucket: -1,
   depthBand: -1,
 };
@@ -63,8 +73,9 @@ function say(text) {
 }
 
 function syncA11y(state) {
-  const cargo = countKey(state.cargo);
-  const delivered = countKey(state.delivered);
+  const cargo = countKey(state.cargo, state.discovered);
+  const delivered = countKey(state.delivered, state.discovered);
+  const known = knownKey(state.discovered || {});
   const bucket = fuelBucket(state.fuel);
   const depthBand = Math.floor(state.depth / 5);
   const fuelLabel = state.fuel <= 0 ? 0 : Math.ceil(state.fuel - 1e-6);
@@ -75,6 +86,7 @@ function syncA11y(state) {
     seen.status = state.status;
     seen.cargo = cargo;
     seen.delivered = delivered;
+    seen.known = known;
     seen.bucket = bucket;
     seen.depthBand = depthBand;
     say(
@@ -88,6 +100,16 @@ function syncA11y(state) {
   const bits = [];
   if (state.status === "stranded" && seen.status !== "stranded") {
     bits.push("Stranded. The pod is out of fuel. Press R to restart.");
+  }
+  if (known !== seen.known) {
+    for (let i = 0; i < ELEMENTS.length; i++) {
+      const symbol = ELEMENTS[i].symbol;
+      const was = seen.known.indexOf(symbol + ",") !== -1;
+      if (!was && state.discovered[symbol]) {
+        const info = elementBySymbol(symbol);
+        bits.push("Element identified: " + info.name + " (" + info.symbol + ").");
+      }
+    }
   }
   if (cargo !== seen.cargo) {
     bits.push("Hold: " + (cargo || "empty") + ".");
@@ -104,6 +126,7 @@ function syncA11y(state) {
   seen.status = state.status;
   seen.cargo = cargo;
   seen.delivered = delivered;
+  seen.known = known;
   seen.bucket = bucket;
   seen.depthBand = depthBand;
   if (bits.length) say(bits.join(" "));

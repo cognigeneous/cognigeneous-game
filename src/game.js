@@ -48,6 +48,8 @@ export function newRun() {
     thrusting: false,
     onGround: true,
     wasDocked: true,
+    // Symbols the player has identified. A later save can persist this object.
+    discovered: {},
     dig: null,
     message: "Step right onto the gray rock. Hold Down or S to dig.",
     messageT: 4.2,
@@ -159,83 +161,79 @@ function isDocked(state) {
   return !!under && under.t === "pad";
 }
 
-/**
- * Nearest solid tile the pod is pressing into.
- * dir is "left", "right", or "down". Up is never returned.
- */
-function findContact(state, dir) {
-  const p = state.player;
-  const x0 = Math.floor((p.x - p.hw) / TILE) - 1;
-  const x1 = Math.floor((p.x + p.hw) / TILE) + 1;
-  const y0 = Math.floor((p.y - p.hh) / TILE) - 1;
-  const y1 = Math.floor((p.y + p.hh) / TILE) + 1;
-  let best = null;
-  let bestScore = Infinity;
+// The one grid cell the pod overlaps the most. Movement stays free;
+// digging uses this cell so one bite cannot choose two targets.
+function dominantCell(p) {
+  const left = p.x - p.hw;
+  const top = p.y - p.hh;
+  const x0 = Math.floor(left / TILE);
+  const x1 = Math.floor((p.x + p.hw) / TILE);
+  const y0 = Math.floor(top / TILE);
+  const y1 = Math.floor((p.y + p.hh) / TILE);
+  let best = { tx: Math.floor(p.x / TILE), ty: Math.floor(p.y / TILE) };
+  let bestArea = -1;
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
-      const tile = getTile(state.world, tx, ty);
-      if (!isSolid(tile)) continue;
-      const left = tx * TILE;
-      const top = ty * TILE;
-      const right = left + TILE;
-      const bottom = top + TILE;
-      let dist = Infinity;
-      if (dir === "left") dist = p.x - p.hw - right;
-      else if (dir === "right") dist = left - (p.x + p.hw);
-      else if (dir === "down") dist = top - (p.y + p.hh);
-      else continue;
-      if (dist > 4) continue;
-      if (dir === "left" && right > p.x) continue;
-      if (dir === "right" && left < p.x) continue;
-      if (dir === "down" && top + 2 < p.y + p.hh) continue;
-      if (dir === "down") {
-        if (right < p.x - p.hw + 2 || left > p.x + p.hw - 2) continue;
-      } else if (bottom < p.y - p.hh + 2 || top > p.y + p.hh - 2) {
-        continue;
-      }
-      // Prefer a tile you can dig, then the one closest to the pod's center.
-      const mid = dir === "down" ? (left + right) / 2 : (top + bottom) / 2;
-      const along = dir === "down" ? p.x : p.y;
-      const score = (isDiggable(tile) ? 0 : 100) + dist + Math.abs(mid - along) * 0.02;
-      if (score < bestScore) {
-        bestScore = score;
-        best = { dir, tx, ty, tile, dist };
+      const w = Math.min(p.x + p.hw, (tx + 1) * TILE) - Math.max(left, tx * TILE);
+      const h = Math.min(p.y + p.hh, (ty + 1) * TILE) - Math.max(top, ty * TILE);
+      const area = (w > 0 ? w : 0) * (h > 0 ? h : 0);
+      if (area > bestArea) {
+        bestArea = area;
+        best = { tx: tx, ty: ty };
       }
     }
   }
   return best;
 }
 
-function pickDig(state, keys) {
-  if (keys.left && !keys.right) {
-    const hit = findContact(state, "left");
-    if (hit && isDiggable(hit.tile)) return hit;
-  }
-  if (keys.right && !keys.left) {
-    const hit = findContact(state, "right");
-    if (hit && isDiggable(hit.tile)) return hit;
-  }
-  if (keys.down) {
-    const hit = findContact(state, "down");
-    if (hit && isDiggable(hit.tile)) return hit;
-  }
+function cellInDirection(cell, dir) {
+  if (dir === "left") return { tx: cell.tx - 1, ty: cell.ty };
+  if (dir === "right") return { tx: cell.tx + 1, ty: cell.ty };
+  if (dir === "down") return { tx: cell.tx, ty: cell.ty + 1 };
   return null;
 }
 
+// Down wins over a sideways key so one press still has one target.
+function heldDigDir(keys) {
+  if (keys.up) return null;
+  if (keys.down) return "down";
+  if (keys.left && !keys.right) return "left";
+  if (keys.right && !keys.left) return "right";
+  return null;
+}
+
+function againstCell(p, dir, tx, ty) {
+  // A pod centered in a cell is about 9px from the next solid face.
+  const reach = 12;
+  const left = tx * TILE;
+  const top = ty * TILE;
+  if (dir === "down") return top - (p.y + p.hh) <= reach && top + TILE > p.y;
+  if (dir === "left") return p.x - p.hw - (left + TILE) <= reach && left < p.x;
+  if (dir === "right") return left - (p.x + p.hw) <= reach && left + TILE > p.x;
+  return false;
+}
+
+function digGoal(dir, tx, ty, p) {
+  const cx = (tx + 0.5) * TILE;
+  const cy = (ty + 0.5) * TILE;
+  if (dir === "down") return { x: cx, y: ty * TILE - p.hh };
+  if (dir === "left") return { x: (tx + 1) * TILE + p.hw, y: cy };
+  return { x: tx * TILE - p.hw, y: cy };
+}
+
 function blockedHint(state, keys) {
-  let dir = null;
-  if (keys.down) dir = "down";
-  else if (keys.left && !keys.right) dir = "left";
-  else if (keys.right && !keys.left) dir = "right";
-  if (!dir) return;
-  const hit = findContact(state, dir);
-  if (!hit || isDiggable(hit.tile)) return;
-  if (hit.tile.t === "bedrock") {
+  const dir = heldDigDir(keys);
+  if (!dir || !feetOnSolid(state)) return;
+  const at = cellInDirection(dominantCell(state.player), dir);
+  if (!at || !againstCell(state.player, dir, at.tx, at.ty)) return;
+  const tile = getTile(state.world, at.tx, at.ty);
+  if (!tile || isDiggable(tile)) return;
+  if (tile.t === "bedrock") {
     state.message = "Bedrock cannot be dug.";
     state.messageT = Math.max(state.messageT, 0.45);
     return;
   }
-  if (hit.tile.t === "pad" || hit.tile.t === "base") {
+  if (tile.t === "pad" || tile.t === "base") {
     state.message = "The base cannot be dug. Dig the gray rock.";
     state.messageT = Math.max(state.messageT, 0.45);
   }
@@ -262,8 +260,86 @@ function spray(state, tx, ty, kind, el, count, speed) {
   }
 }
 
-function applyDig(state, target, dt) {
-  const tile = getTile(state.world, target.tx, target.ty);
+function canBrace(state) {
+  if (feetOnSolid(state)) return true;
+  // Centered in a cell that just opened, not flying.
+  return Math.abs(state.player.vy) < 40 && Math.abs(state.player.vx) < 40;
+}
+
+function startDig(state, dir) {
+  const at = cellInDirection(dominantCell(state.player), dir);
+  if (!at) return false;
+  const tile = getTile(state.world, at.tx, at.ty);
+  if (!tile || !isDiggable(tile)) return false;
+  if (!againstCell(state.player, dir, at.tx, at.ty)) return false;
+  if (!canBrace(state)) return false;
+  state.dig = {
+    tx: at.tx,
+    ty: at.ty,
+    dir: dir,
+    p: 0,
+    x0: state.player.x,
+    y0: state.player.y,
+  };
+  return true;
+}
+
+function slideToGoal(state) {
+  const dig = state.dig;
+  const p = state.player;
+  const goal = digGoal(dig.dir, dig.tx, dig.ty, p);
+  const t = dig.p;
+  p.x = dig.x0 + (goal.x - dig.x0) * t;
+  p.y = dig.y0 + (goal.y - dig.y0) * t;
+  p.vx = 0;
+  p.vy = 0;
+}
+
+function finishDig(state, tile) {
+  const dig = state.dig;
+  if (tile.t === "ore") {
+    const info = elementBySymbol(tile.el);
+    const first = !state.discovered[tile.el];
+    state.discovered[tile.el] = true;
+    state.cargo[tile.el] = (state.cargo[tile.el] || 0) + 1;
+    if (first && info) {
+      state.message = "Element identified: " + info.name + " (" + info.symbol + ")";
+      state.messageT = 2.6;
+    } else if (info && state.message.indexOf("Element identified") !== 0) {
+      state.message = "Collected " + info.name + " (" + info.symbol + ")";
+      state.messageT = 1.15;
+    }
+  }
+  spray(state, dig.tx, dig.ty, tile.t, tile.el, 8, 90);
+  tile.t = "empty";
+  tile.el = null;
+  // One cell, and the pod is centered in it. Nothing else is cleared.
+  state.player.x = (dig.tx + 0.5) * TILE;
+  state.player.y = (dig.ty + 0.5) * TILE;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.dig = null;
+}
+
+// True while a single locked cell is being dug. Movement is skipped then.
+function updateDig(state, keys, dt) {
+  const dir = heldDigDir(keys);
+  if (!dir) {
+    state.dig = null;
+    if (!keys.up) blockedHint(state, keys);
+    return false;
+  }
+
+  if (!state.dig || state.dig.dir !== dir) {
+    if (!startDig(state, dir)) {
+      state.dig = null;
+      blockedHint(state, keys);
+      return false;
+    }
+  }
+
+  const dig = state.dig;
+  const tile = getTile(state.world, dig.tx, dig.ty);
   if (!tile || !isDiggable(tile)) {
     state.dig = null;
     return false;
@@ -271,31 +347,23 @@ function applyDig(state, target, dt) {
   if (tile.t === "ore" && totalCount(state.cargo) >= state.cargoMax) {
     state.message = "Cargo full. Return to the PAD.";
     state.messageT = Math.max(state.messageT, 0.45);
-    return false;
+    slideToGoal(state);
+    state.drill = dir;
+    return true;
   }
-  if (!state.dig || state.dig.tx !== target.tx || state.dig.ty !== target.ty) {
-    state.dig = { tx: target.tx, ty: target.ty, p: 0 };
-  }
-  state.dig.p += dt / (DIG_TIME[tile.t] || 0.2);
+
+  dig.p += dt / (DIG_TIME[tile.t] || 0.2);
   state.moteAcc += dt;
   if (state.moteAcc >= 0.06) {
     state.moteAcc = 0;
-    spray(state, target.tx, target.ty, tile.t, tile.el, 1, 36);
+    spray(state, dig.tx, dig.ty, tile.t, tile.el, 1, 36);
   }
-  if (state.dig.p < 1) return true;
-
-  if (tile.t === "ore") {
-    const info = elementBySymbol(tile.el);
-    state.cargo[tile.el] = (state.cargo[tile.el] || 0) + 1;
-    state.message = info
-      ? "Collected " + info.name + " (" + info.symbol + ")"
-      : "Collected " + tile.el;
-    state.messageT = 1.15;
+  state.drill = dir;
+  if (dig.p < 1) {
+    slideToGoal(state);
+    return true;
   }
-  spray(state, target.tx, target.ty, tile.t, tile.el, 8, 90);
-  tile.t = "empty";
-  tile.el = null;
-  state.dig = null;
+  finishDig(state, tile);
   return true;
 }
 
@@ -348,30 +416,24 @@ export function step(state, keys, dt) {
 
   state.onGround = feetOnSolid(state);
   state.thrusting = !!keys.up;
-  if (state.onGround && !keys.up) {
-    p.vy = 0;
-  } else {
-    let ay = GRAVITY;
-    if (keys.down) ay += DOWN_BOOST;
-    if (keys.up) ay -= THRUST;
-    p.vy = clamp(p.vy + ay * dt, -MAX_RISE, MAX_FALL);
-  }
 
-  const target = pickDig(state, keys);
-  let digging = false;
-  if (target) {
-    state.drill = target.dir === "down" ? "down" : target.dir;
-    digging = applyDig(state, target, dt);
-  } else {
-    state.dig = null;
-    blockedHint(state, keys);
-  }
-
-  moveX(state, p.vx * dt);
-  moveY(state, p.vy * dt);
-  if (p.y < p.hh) {
-    p.y = p.hh;
-    if (p.vy < 0) p.vy = 0;
+  // A dig locks one cell and slides the pod into it. Open air stays free.
+  const digging = updateDig(state, keys, dt);
+  if (!digging) {
+    if (state.onGround && !keys.up) {
+      p.vy = 0;
+    } else {
+      let ay = GRAVITY;
+      if (keys.down) ay += DOWN_BOOST;
+      if (keys.up) ay -= THRUST;
+      p.vy = clamp(p.vy + ay * dt, -MAX_RISE, MAX_FALL);
+    }
+    moveX(state, p.vx * dt);
+    moveY(state, p.vy * dt);
+    if (p.y < p.hh) {
+      p.y = p.hh;
+      if (p.vy < 0) p.vy = 0;
+    }
   }
 
   state.onGround = feetOnSolid(state);

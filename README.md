@@ -10,11 +10,11 @@ This is the dig loop only. A shop, saves, an ionic-compound bench, and a codex a
 
 Arrow keys or W A S D. The same keys do both jobs:
 
-- Left and right move the pod. If rock is in the way, the pod digs sideways.
-- Down digs. Hold it; a tile breaks after a short bite. Hard rock (diagonal stripes) takes longer.
+- In open space the pod drives and flies freely. It is not locked to the grid.
+- Left, right, or down, held against rock while the pod is on the ground, digs exactly one cell: the cell in that direction from the block the pod overlaps most. The pod slides into line with that cell and sits in its center when the bite finishes. Hard rock (diagonal stripes) takes longer. One bite never clears two cells.
 - Up thrusts. The pod cannot dig upward. Gravity pulls it down. Letting go of Up drops you.
 - Sitting still and falling do not use fuel. Thrusters, sideways driving, and digging do.
-- Ore tiles show the element symbol, so you do not have to read the color. The hold has 8 slots. Land on the green PAD to refuel for free and move the hold into Delivered.
+- Ore starts unidentified: a color, a shape that is different for each element, and a question mark. The first time you dig an element, it is identified and every cell of that element shows its symbol. The hold has 8 slots. Land on the green PAD to refuel for free and move the hold into Delivered.
 - At 0 fuel away from the pad, the pod is stranded. Press R to restart the same map.
 
 The map is built from a fixed seed, so a reload is the same asteroid.
@@ -46,4 +46,4 @@ GitHub Pages can host the main branch from the repository root. Paths in the pag
 
 ## Accessibility
 
-Play is keyboard-only. HUD and tile symbols are drawn at 16px or larger. Dirt, hard rock, bedrock, and the pad use different patterns, not color alone. Accent colors are the Okabe–Ito set. A live region repeats cargo, depth, fuel warnings, and the stranded state.
+Play is keyboard-only. HUD text and ore marks are drawn at 16px or larger. Dirt, hard rock, bedrock, the pad, and each unidentified ore use a different pattern, not color alone. Accent colors are the Okabe–Ito set. A live region repeats discoveries, cargo, depth, fuel warnings, and the stranded state.
