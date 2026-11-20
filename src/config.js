@@ -43,6 +43,8 @@ export const UPGRADES = {
 };
 
 export const MESSAGE_TIME = 3;
+// How often the full-hold warning can appear while the player keeps digging.
+export const HOLD_FULL_TOAST_GAP = 4;
 export const HUD_TITLE = 28;
 export const HUD_FONT = 20;
 export const HUD_LINE = 28;
