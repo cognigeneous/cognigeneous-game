@@ -14,6 +14,12 @@ import {
   PAD_X1,
   SURFACE_ROW,
   TILE,
+  SOLAR_RATE,
+  HUD_TITLE,
+  HUD_FONT,
+  HUD_LINE,
+  TOAST_FONT,
+  TOAST_FONT_STRONG,
 } from "./config.js";
 import { listHeld, totalCount } from "./data/elements.js";
 
@@ -376,21 +382,24 @@ function drawPod(ctx, state, camX, camY) {
 
 function drawToast(ctx, state, viewW, viewH) {
   if (state.status === "stranded" || state.messageT <= 0 || !state.message) return;
-  const identified = state.message.indexOf("Element identified") === 0;
-  ctx.font = (identified ? "bold 18px " : "16px ") + FONT;
-  const width = Math.min(viewW - 24, Math.ceil(ctx.measureText(state.message).width + 28));
-  const height = identified ? 44 : 36;
+  const strong =
+    state.message.indexOf("Element identified") === 0 ||
+    state.message.indexOf("Delivered") === 0;
+  const size = strong ? TOAST_FONT_STRONG : TOAST_FONT;
+  ctx.font = "bold " + size + "px " + FONT;
+  const width = Math.min(viewW - 24, Math.ceil(ctx.measureText(state.message).width + 36));
+  const height = size + 28;
   const bx = Math.round((viewW - width) / 2);
-  const by = 14;
-  ctx.fillStyle = COLOR.hud;
+  const by = 16;
+  ctx.fillStyle = "#07090e";
   ctx.fillRect(bx, by, width, height);
   ctx.strokeStyle = COLOR.hudLine;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(bx + 1, by + 1, width - 2, height - 2);
-  setFont(ctx, identified ? 18 : 16, identified);
-  ctx.fillStyle = COLOR.text;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(bx + 1.5, by + 1.5, width - 3, height - 3);
+  setFont(ctx, size, true);
+  ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
-  ctx.fillText(state.message, Math.round(viewW / 2), by + (identified ? 12 : 9));
+  ctx.fillText(state.message, Math.round(viewW / 2), by + 12);
 }
 
 function drawStranded(ctx, viewW, viewH) {
@@ -416,23 +425,23 @@ function drawStranded(ctx, viewW, viewH) {
 
 function drawCountList(ctx, x, y, counts, maxY, discovered) {
   const rows = listHeld(counts);
-  setFont(ctx, 16, false);
+  setFont(ctx, HUD_FONT, false);
   if (!rows.length) {
-    ctx.fillStyle = COLOR.muted;
+    ctx.fillStyle = "#ffffff";
     ctx.fillText("none yet", x, y);
-    return y + 24;
+    return y + HUD_LINE;
   }
   for (let i = 0; i < rows.length; i++) {
-    if (y + 22 > maxY) break;
+    if (y + HUD_LINE > maxY) break;
     const row = rows[i];
     const known = discovered && discovered[row.symbol];
-    ctx.fillStyle = COLOR.text;
+    ctx.fillStyle = "#ffffff";
     ctx.fillText(
       known ? row.symbol + "  ×" + row.count + "   " + row.name : "?  ×" + row.count,
       x,
       y
     );
-    y += 22;
+    y += HUD_LINE;
   }
   return y;
 }
@@ -443,92 +452,102 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   ctx.fillStyle = COLOR.hudLine;
   ctx.fillRect(viewW, 0, 6, cssH);
 
-  const left = viewW + 20;
+  const left = viewW + 18;
   const inner = hudW - 36;
-  let y = 20;
+  let y = 18;
 
-  setFont(ctx, 24, true);
-  ctx.fillStyle = COLOR.text;
+  setFont(ctx, HUD_TITLE, true);
+  ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
   ctx.fillText(GAME_TITLE, left, y);
-  y += 32;
+  y += HUD_TITLE + 8;
 
-  setFont(ctx, 16, false);
-  ctx.fillStyle = COLOR.muted;
+  setFont(ctx, HUD_FONT, false);
+  ctx.fillStyle = "#ffffff";
   ctx.fillText("Map seed " + state.world.seed, left, y);
-  y += 30;
+  y += HUD_LINE;
 
   const fuelN = state.fuel <= 0 ? 0 : Math.ceil(state.fuel - 1e-6);
   const low = state.status === "playing" && state.fuel <= 25;
-  setFont(ctx, 16, true);
-  ctx.fillStyle = COLOR.text;
+  setFont(ctx, HUD_FONT, true);
+  ctx.fillStyle = "#ffffff";
   ctx.fillText("Fuel  " + fuelN + " / " + state.maxFuel, left, y);
   if (low) {
     const labelW = ctx.measureText("Fuel  " + fuelN + " / " + state.maxFuel).width;
     ctx.fillStyle = COLOR.fuelMid;
-    ctx.fillText("Low", left + labelW + 10, y);
+    ctx.fillText("Low", left + labelW + 12, y);
   }
-  y += 24;
+  y += HUD_LINE - 4;
 
   ctx.fillStyle = "#2a2a2a";
-  ctx.fillRect(left, y, inner, 20);
+  ctx.fillRect(left, y, inner, 22);
   const ratio = clamp(state.fuel / state.maxFuel, 0, 1);
   ctx.fillStyle = ratio > 0.5 ? COLOR.fuelOk : ratio > 0.25 ? COLOR.fuelMid : COLOR.fuelLow;
-  ctx.fillRect(left, y, Math.round(inner * ratio), 20);
-  ctx.strokeStyle = COLOR.text;
+  ctx.fillRect(left, y, Math.round(inner * ratio), 22);
+  ctx.strokeStyle = "#ffffff";
   ctx.lineWidth = 2;
-  ctx.strokeRect(left + 1, y + 1, inner - 2, 18);
-  y += 32;
+  ctx.strokeRect(left + 1, y + 1, inner - 2, 20);
+  y += 30;
 
-  setFont(ctx, 16, true);
-  ctx.fillStyle = COLOR.text;
+  const baseN = Math.max(0, Math.min(state.baseEnergyMax, Math.floor(state.baseEnergy + 1e-4)));
+  setFont(ctx, HUD_FONT, true);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("Base energy: " + baseN + " / " + state.baseEnergyMax, left, y);
+  y += HUD_LINE;
+  setFont(ctx, HUD_FONT, true);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("Solar +" + SOLAR_RATE + "/s", left, y);
+  y += HUD_LINE + 4;
+
+  setFont(ctx, HUD_FONT, true);
+  ctx.fillStyle = "#ffffff";
   ctx.fillText("Cargo  " + totalCount(state.cargo) + " / " + state.cargoMax, left, y);
-  y += 24;
+  y += HUD_LINE;
   ctx.fillText("Depth  " + state.depth + " m", left, y);
-  y += 32;
+  y += HUD_LINE + 4;
 
   const controls = [
     "Controls",
     "Arrows or W A S D",
     "Up or W: thrust",
-    "Left and right: move, dig",
+    "Sides dig when landed",
     "Down or S: dig",
     "Up does not dig",
-    "PAD: refuel and unload",
+    "PAD: charge and unload",
     "R: restart",
   ];
-  const controlsTop = cssH - 18 - controls.length * 22;
-  const listBottom = controlsTop - 12;
+  const controlsTop = cssH - 16 - controls.length * HUD_LINE;
+  const listBottom = controlsTop - 8;
 
-  setFont(ctx, 16, true);
-  ctx.fillStyle = COLOR.text;
+  setFont(ctx, HUD_FONT, true);
+  ctx.fillStyle = "#ffffff";
   ctx.fillText("In the hold", left, y);
-  y += 24;
+  y += HUD_LINE;
   y = drawCountList(ctx, left, y, state.cargo, listBottom, state.discovered);
-  y += 8;
-  if (y + 24 < listBottom) {
-    setFont(ctx, 16, true);
-    ctx.fillStyle = COLOR.text;
+  y += 6;
+  if (y + HUD_LINE < listBottom) {
+    setFont(ctx, HUD_FONT, true);
+    ctx.fillStyle = "#ffffff";
     ctx.fillText("Delivered", left, y);
-    y += 24;
+    y += HUD_LINE;
     drawCountList(ctx, left, y, state.delivered, listBottom, state.discovered);
   }
 
   let cy = controlsTop;
   for (let i = 0; i < controls.length; i++) {
     const head = i === 0;
-    setFont(ctx, 16, head);
-    ctx.fillStyle = head ? COLOR.text : COLOR.muted;
+    setFont(ctx, HUD_FONT, true);
+    ctx.fillStyle = "#ffffff";
     ctx.textAlign = "left";
     ctx.fillText(controls[i], left, cy);
-    cy += 22;
+    cy += HUD_LINE;
   }
 }
 
 export function draw(ctx, cssW, cssH, dpr, state) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.globalAlpha = 1;
-  const hudW = clamp(Math.floor(cssW * 0.3), 230, 300);
+  const hudW = clamp(Math.floor(cssW * 0.32), 280, 360);
   const viewW = Math.max(160, cssW - hudW);
   const viewH = cssH;
   const worldW = MAP_W * TILE;

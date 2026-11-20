@@ -17,6 +17,11 @@ import {
   THRUST,
   THRUST_BURN,
   TILE,
+  BASE_ENERGY_MAX,
+  PAD_TRANSFER_RATE,
+  SOLAR_RATE,
+  UPGRADES,
+  MESSAGE_TIME,
 } from "./config.js";
 import { elementBySymbol, ELEMENTS, totalCount } from "./data/elements.js";
 import {
@@ -37,6 +42,8 @@ export function newRun() {
     player: spawnPlayer(),
     fuel: MAX_FUEL,
     maxFuel: MAX_FUEL,
+    baseEnergy: BASE_ENERGY_MAX,
+    baseEnergyMax: BASE_ENERGY_MAX,
     cargo: {},
     cargoMax: CARGO_MAX,
     delivered: {},
@@ -52,7 +59,7 @@ export function newRun() {
     discovered: {},
     dig: null,
     message: "Step right onto the gray rock. Hold Down or S to dig.",
-    messageT: 4.2,
+    messageT: MESSAGE_TIME,
     particles: [],
     moteAcc: 0,
   };
@@ -230,12 +237,12 @@ function blockedHint(state, keys) {
   if (!tile || isDiggable(tile)) return;
   if (tile.t === "bedrock") {
     state.message = "Bedrock cannot be dug.";
-    state.messageT = Math.max(state.messageT, 0.45);
+    state.messageT = Math.max(state.messageT, MESSAGE_TIME);
     return;
   }
   if (tile.t === "pad" || tile.t === "base") {
     state.message = "The base cannot be dug. Dig the gray rock.";
-    state.messageT = Math.max(state.messageT, 0.45);
+    state.messageT = Math.max(state.messageT, MESSAGE_TIME);
   }
 }
 
@@ -266,7 +273,17 @@ function canBrace(state) {
   return Math.abs(state.player.vy) < 40 && Math.abs(state.player.vx) < 40;
 }
 
-function startDig(state, dir) {
+// Left and Right dig on the ground only, unless the air-drill upgrade is on.
+// Up plus a sideways key never digs.
+function sideDigAllowed(state, keys, dir) {
+  if (dir !== "left" && dir !== "right") return true;
+  if (keys.up) return false;
+  if (UPGRADES.airDrill) return true;
+  return feetOnSolid(state);
+}
+
+function startDig(state, keys, dir) {
+  if (!sideDigAllowed(state, keys, dir)) return false;
   const at = cellInDirection(dominantCell(state.player), dir);
   if (!at) return false;
   const tile = getTile(state.world, at.tx, at.ty);
@@ -304,10 +321,10 @@ function finishDig(state, tile) {
     state.cargo[tile.el] = (state.cargo[tile.el] || 0) + 1;
     if (first && info) {
       state.message = "Element identified: " + info.name + " (" + info.symbol + ")";
-      state.messageT = 2.6;
+      state.messageT = MESSAGE_TIME;
     } else if (info && state.message.indexOf("Element identified") !== 0) {
       state.message = "Collected " + info.name + " (" + info.symbol + ")";
-      state.messageT = 1.15;
+      state.messageT = MESSAGE_TIME;
     }
   }
   spray(state, dig.tx, dig.ty, tile.t, tile.el, 8, 90);
@@ -324,6 +341,8 @@ function finishDig(state, tile) {
 // True while a single locked cell is being dug. Movement is skipped then.
 function updateDig(state, keys, dt) {
   const dir = heldDigDir(keys);
+  // Up, or no dig key, cancels. An in-progress bite may slide the feet
+  // off the floor; that slide should not cancel a dig that started grounded.
   if (!dir) {
     state.dig = null;
     if (!keys.up) blockedHint(state, keys);
@@ -331,7 +350,7 @@ function updateDig(state, keys, dt) {
   }
 
   if (!state.dig || state.dig.dir !== dir) {
-    if (!startDig(state, dir)) {
+    if (!sideDigAllowed(state, keys, dir) || !startDig(state, keys, dir)) {
       state.dig = null;
       blockedHint(state, keys);
       return false;
@@ -346,7 +365,7 @@ function updateDig(state, keys, dt) {
   }
   if (tile.t === "ore" && totalCount(state.cargo) >= state.cargoMax) {
     state.message = "Cargo full. Return to the PAD.";
-    state.messageT = Math.max(state.messageT, 0.45);
+    state.messageT = Math.max(state.messageT, MESSAGE_TIME);
     slideToGoal(state);
     state.drill = dir;
     return true;
@@ -365,6 +384,31 @@ function updateDig(state, keys, dt) {
   }
   finishDig(state, tile);
   return true;
+}
+
+function note(state, text) {
+  state.message = text;
+  state.messageT = MESSAGE_TIME;
+}
+
+// Panels always trickle in. The pad moves store energy into the pod while docked.
+function tickEnergy(state, docked, dt) {
+  const before = state.baseEnergy;
+  state.baseEnergy = Math.min(state.baseEnergyMax, state.baseEnergy + SOLAR_RATE * dt);
+  if (!docked) {
+    if (before > 0 && state.baseEnergy <= 0) note(state, "Solar panels are recharging the base.");
+    return;
+  }
+  const room = state.maxFuel - state.fuel;
+  const give = Math.min(PAD_TRANSFER_RATE * dt, state.baseEnergy, room > 0 ? room : 0);
+  if (give > 0) {
+    state.baseEnergy -= give;
+    state.fuel += give;
+  }
+  const empty = state.baseEnergy <= 0.05;
+  if ((before > 0.05 && empty) || (empty && state.fuel < state.maxFuel - 0.2 && !state.wasDocked)) {
+    note(state, "Solar panels are recharging the base.");
+  }
 }
 
 function bankCargo(state) {
@@ -446,21 +490,13 @@ export function step(state, keys, dt) {
     if (digging) state.fuel -= DIG_BURN * dt;
   }
 
-  // Later slice: open the shop from this dock. For now, free fuel and unload.
-  if (docked) {
-    const unloaded = bankCargo(state);
-    const wasLow = state.fuel < state.maxFuel - 0.2;
-    state.fuel = state.maxFuel;
-    if (unloaded > 0) {
-      state.message =
-        unloaded === 1
-          ? "Delivered 1 ore. Tanks refilled."
-          : "Delivered " + unloaded + " ores. Tanks refilled.";
-      state.messageT = 2.8;
-    } else if (wasLow && !state.wasDocked) {
-      state.message = "Tanks refilled.";
-      state.messageT = 1.8;
-    }
+  // Later slice: open the shop from this dock. Cargo unloads at once.
+  // Pod fuel comes out of the base store at PAD_TRANSFER_RATE.
+  let unloaded = 0;
+  if (docked) unloaded = bankCargo(state);
+  tickEnergy(state, docked, dt);
+  if (unloaded > 0) {
+    note(state, unloaded === 1 ? "Delivered 1 ore." : "Delivered " + unloaded + " ores.");
   }
   state.wasDocked = docked;
 
