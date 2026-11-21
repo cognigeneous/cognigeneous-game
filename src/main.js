@@ -1,8 +1,9 @@
 // Startup, frame loop, and the screen-reader mirror of the HUD.
-import { GAME_TITLE, MAX_FUEL } from "./config.js";
-import { ELEMENTS, elementBySymbol, holdMass, listHeld } from "./data/elements.js";
+import { GAME_TITLE } from "./config.js";
+import { ELEMENTS, elementBySymbol, listHeld } from "./data/elements.js";
 import { createGame } from "./game.js";
 import { draw } from "./draw.js";
+import { marketRows } from "./market.js";
 
 const canvas = document.getElementById("game");
 const live = document.getElementById("live");
@@ -12,11 +13,14 @@ document.title = GAME_TITLE;
 canvas.setAttribute("aria-label", GAME_TITLE);
 
 const game = createGame();
+// Headless checks read the live run from here. Play does not depend on it.
+window.assay = game;
 
 const intro =
   GAME_TITLE +
   ". Arrow keys or W A S D. Up thrusts. Left and right move and dig. Down digs. Up does not dig. " +
-  "Unknown ore shows a question mark until you dig it. Land on the pad to refuel and unload. Press R to restart.";
+  "Unknown ore shows a question mark until you dig it. Land on the pad to charge. " +
+  "Press M or Enter on the pad to sell ore and buy upgrades. Press R to restart.";
 
 let cssW = 1;
 let cssH = 1;
@@ -69,6 +73,12 @@ const seen = {
   known: "",
   bucket: -1,
   depthBand: -1,
+  marketOpen: false,
+  cursor: -1,
+  rowLabel: "",
+  note: "",
+  credits: -1,
+  maxFuel: -1,
 };
 
 function say(text) {
@@ -92,6 +102,12 @@ function syncA11y(state) {
     seen.known = known;
     seen.bucket = bucket;
     seen.depthBand = depthBand;
+    seen.marketOpen = !!state.marketOpen;
+    seen.cursor = state.marketCursor;
+    seen.rowLabel = "";
+    seen.note = state.marketNote || "";
+    seen.credits = state.credits;
+    seen.maxFuel = state.maxFuel;
     say(
       restarted
         ? "Run restarted. Fuel full. Hold empty. Delivered none."
@@ -118,10 +134,24 @@ function syncA11y(state) {
     bits.push("Hold: " + (cargo || "empty") + ".");
   }
   if (delivered !== seen.delivered) {
-    bits.push("Delivered: " + (delivered || "none") + ". Tanks refilled.");
+    bits.push("Sold from the hold: " + (delivered || "none") + ".");
   }
+  if (!!state.marketOpen !== seen.marketOpen) {
+    bits.push(state.marketOpen ? "Base market open. Credits " + state.credits + "." : "Market closed.");
+  }
+  if (state.marketOpen) {
+    const rows = marketRows(state);
+    const row = rows[state.marketCursor];
+    const label = row ? row.label : "";
+    if (label && (state.marketCursor !== seen.cursor || label !== seen.rowLabel)) bits.push(label);
+    seen.cursor = state.marketCursor;
+    seen.rowLabel = label;
+  }
+  if (state.marketNote && state.marketNote !== seen.note) bits.push(state.marketNote);
+  if (state.credits !== seen.credits) bits.push("Credits " + state.credits + ".");
+  if (state.maxFuel !== seen.maxFuel) bits.push("Max fuel " + state.maxFuel + ".");
   if (bucket !== seen.bucket && state.status === "playing") {
-    bits.push("Fuel " + fuelLabel + " of " + MAX_FUEL + ". Depth " + state.depth + " meters.");
+    bits.push("Fuel " + fuelLabel + " of " + state.maxFuel + ". Depth " + state.depth + " meters.");
   } else if (depthBand !== seen.depthBand && state.status === "playing") {
     bits.push("Depth " + state.depth + " meters.");
   }
@@ -132,6 +162,10 @@ function syncA11y(state) {
   seen.known = known;
   seen.bucket = bucket;
   seen.depthBand = depthBand;
+  seen.marketOpen = !!state.marketOpen;
+  seen.note = state.marketNote || "";
+  seen.credits = state.credits;
+  seen.maxFuel = state.maxFuel;
   if (bits.length) say(bits.join(" "));
 }
 

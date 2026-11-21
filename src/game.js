@@ -27,7 +27,17 @@ import {
   SILICATE_PER_ROCK,
   SILICATE_PER_BLOCK,
 } from "./config.js";
-import { elementBySymbol, ELEMENTS, holdMass } from "./data/elements.js";
+import { elementBySymbol, holdMass } from "./data/elements.js";
+import {
+  activateMarket,
+  applyRanks,
+  applySave,
+  captureSave,
+  clearSave,
+  loadSave,
+  moveCursor,
+  saveGame,
+} from "./market.js";
 import {
   generateWorld,
   getTile,
@@ -64,6 +74,14 @@ export function newRun() {
     wasDocked: true,
     // Symbols the player has identified. A later save can persist this object.
     discovered: {},
+    credits: 0,
+    upgrades: { fuelCell: 0, baseStorage: 0, solar: 0 },
+    solarRate: SOLAR_RATE,
+    docked: true,
+    marketOpen: false,
+    marketCursor: 0,
+    marketConfirm: false,
+    marketNote: "",
     dig: null,
     holdFullAt: -999,
     message: "Step right onto the gray rock. Hold Down or S to dig.",
@@ -71,6 +89,14 @@ export function newRun() {
     particles: [],
     moteAcc: 0,
   };
+}
+
+function beginRun() {
+  const state = newRun();
+  applyRanks(state);
+  state.fuel = state.maxFuel;
+  state.baseEnergy = state.baseEnergyMax;
+  return state;
 }
 
 function clamp(v, lo, hi) {
@@ -438,7 +464,8 @@ function bankSilicate(state) {
 // Panels always trickle in. The pad moves store energy into the pod while docked.
 function tickEnergy(state, docked, dt) {
   const before = state.baseEnergy;
-  state.baseEnergy = Math.min(state.baseEnergyMax, state.baseEnergy + SOLAR_RATE * dt);
+  const solar = typeof state.solarRate === "number" ? state.solarRate : SOLAR_RATE;
+  state.baseEnergy = Math.min(state.baseEnergyMax, state.baseEnergy + solar * dt);
   if (!docked) {
     if (before > 0 && state.baseEnergy <= 0) note(state, "Solar panels are recharging the base.");
     return;
@@ -453,19 +480,6 @@ function tickEnergy(state, docked, dt) {
   if ((before > 0.05 && empty) || (empty && state.fuel < state.maxFuel - 0.2 && !state.wasDocked)) {
     note(state, "Solar panels are recharging the base.");
   }
-}
-
-function bankCargo(state) {
-  let n = 0;
-  for (let i = 0; i < ELEMENTS.length; i++) {
-    const symbol = ELEMENTS[i].symbol;
-    const count = state.cargo[symbol] || 0;
-    if (!count) continue;
-    state.delivered[symbol] = (state.delivered[symbol] || 0) + count;
-    n += count;
-  }
-  if (n > 0) state.cargo = {};
-  return n;
 }
 
 function updateParticles(state, dt) {
@@ -537,19 +551,19 @@ export function step(state, keys, dt) {
     }
   }
 
-  // Later slice: open the shop from this dock. Cargo unloads at once.
+  // Ore stays in the hold until the market sells it. Silicate banks here.
   // Pod fuel comes out of the base store at PAD_TRANSFER_RATE.
-  let unloaded = 0;
   let formed = 0;
-  if (docked) {
-    unloaded = bankCargo(state);
-    formed = bankSilicate(state);
-  }
+  if (docked) formed = bankSilicate(state);
   tickEnergy(state, docked, dt);
-  if (unloaded > 0) {
-    note(state, unloaded === 1 ? "Delivered 1 ore." : "Delivered " + unloaded + " ores.");
+  if (docked && !state.wasDocked) {
+    saveGame(state);
+    if (formed > 0) note(state, "Silicate block formed!");
+    else note(state, "Docked. Press M or Enter for the market.");
+  } else if (formed > 0) {
+    note(state, "Silicate block formed!");
   }
-  if (formed > 0) note(state, "Silicate block formed!");
+  state.docked = docked;
   state.wasDocked = docked;
 
   if (state.fuel <= 0 && !docked) {
@@ -578,9 +592,61 @@ function setKey(keys, name, down) {
   else if (name === "arrowdown" || name === "down" || name === "s") keys.down = down;
 }
 
+function openMarket(state, keys) {
+  keys.left = false;
+  keys.right = false;
+  keys.up = false;
+  keys.down = false;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.thrusting = false;
+  state.dig = null;
+  state.marketOpen = true;
+  state.marketCursor = 0;
+  state.marketConfirm = false;
+  state.marketNote = "Sell ore from the hold, or buy an upgrade.";
+}
+
+function closeMarket(state) {
+  state.marketOpen = false;
+  state.marketConfirm = false;
+  saveGame(state);
+}
+
+function onMarketKey(state, name) {
+  if (name === "escape") {
+    if (state.marketConfirm) {
+      state.marketConfirm = false;
+      state.marketNote = "";
+      return null;
+    }
+    closeMarket(state);
+    return null;
+  }
+  if (name === "arrowup" || name === "w") {
+    moveCursor(state, -1);
+    return null;
+  }
+  if (name === "arrowdown" || name === "s") {
+    moveCursor(state, 1);
+    return null;
+  }
+  if (name === "enter") return activateMarket(state);
+  return null;
+}
+
+function restartRun(state) {
+  const kept = captureSave(state);
+  const next = beginRun();
+  applySave(next, kept, true);
+  return next;
+}
+
 export function createGame() {
   const keys = { left: false, right: false, up: false, down: false };
-  let state = newRun();
+  let state = beginRun();
+  const saved = loadSave();
+  if (saved) applySave(state, saved, true);
 
   function onDown(e) {
     const name = e.key.toLowerCase();
@@ -588,12 +654,33 @@ export function createGame() {
       name === "arrowup" ||
       name === "arrowdown" ||
       name === "arrowleft" ||
-      name === "arrowright"
+      name === "arrowright" ||
+      name === " "
     ) {
       e.preventDefault();
     }
+    if (state.marketOpen) {
+      if (e.repeat) return;
+      const result = onMarketKey(state, name);
+      if (result === "reset") {
+        clearSave();
+        state = beginRun();
+        state.message = "New game. Credits and upgrades cleared.";
+        state.messageT = MESSAGE_TIME;
+      }
+      return;
+    }
     if (name === "r") {
-      if (!e.repeat) state = newRun();
+      if (!e.repeat) state = restartRun(state);
+      return;
+    }
+    if (
+      (name === "m" || name === "enter") &&
+      !e.repeat &&
+      state.status === "playing" &&
+      state.docked
+    ) {
+      openMarket(state, keys);
       return;
     }
     setKey(keys, name, true);
@@ -617,6 +704,10 @@ export function createGame() {
       return state;
     },
     update(dt) {
+      if (state.marketOpen) {
+        if (state.messageT > 0) state.messageT -= dt;
+        return;
+      }
       step(state, keys, dt);
     },
   };

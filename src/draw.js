@@ -21,8 +21,12 @@ import {
   HUD_LINE,
   TOAST_FONT,
   TOAST_FONT_STRONG,
+  MARKET_FONT,
+  MARKET_LINE,
+  MARKET_TITLE,
 } from "./config.js";
 import { holdMass, listHeld } from "./data/elements.js";
+import { marketRows } from "./market.js";
 
 function setFont(ctx, size, bold) {
   ctx.font = (bold ? "bold " : "") + size + "px " + FONT;
@@ -34,6 +38,12 @@ function clamp(v, lo, hi) {
   if (v < lo) return lo;
   if (v > hi) return hi;
   return v;
+}
+
+function formatRate(n) {
+  const v = Math.round(n * 10) / 10;
+  if (Math.abs(v - Math.round(v)) < 0.05) return String(Math.round(v));
+  return v.toFixed(1);
 }
 
 function extraMotion() {
@@ -518,7 +528,10 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   y += HUD_LINE;
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("Solar +" + SOLAR_RATE + "/s", left, y);
+  const solar = typeof state.solarRate === "number" ? state.solarRate : SOLAR_RATE;
+  ctx.fillText("Solar +" + formatRate(solar) + "/s", left, y);
+  y += HUD_LINE;
+  ctx.fillText("Credits: " + state.credits, left, y);
   y += HUD_LINE + 4;
 
   setFont(ctx, HUD_FONT, true);
@@ -539,7 +552,8 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
     "Sides dig when landed",
     "Down or S: dig",
     "Up does not dig",
-    "PAD: charge and unload",
+    "PAD: charge the pod",
+    state.docked ? "M or Enter: market" : "Dock to open market",
     "R: restart",
   ];
   const controlsTop = cssH - 16 - controls.length * HUD_LINE;
@@ -605,4 +619,85 @@ export function draw(ctx, cssW, cssH, dpr, state) {
   ctx.restore();
 
   drawHud(ctx, state, viewW, cssH, hudW);
+  if (state.marketOpen) drawMarket(ctx, cssW, cssH, state);
+}
+
+function drawMarket(ctx, cssW, cssH, state) {
+  ctx.fillStyle = "rgba(12, 18, 32, 0.78)";
+  ctx.fillRect(0, 0, cssW, cssH);
+
+  const rows = marketRows(state);
+  const margin = 36;
+  const panelW = Math.min(1040, Math.max(320, cssW - margin * 2));
+  const headerH = 18 + MARKET_TITLE + 8 + MARKET_LINE + MARKET_LINE + 12;
+  const footerH = MARKET_LINE + 28;
+  const listH = Math.max(1, rows.length) * MARKET_LINE;
+  const panelH = Math.min(cssH - margin * 2, headerH + listH + footerH);
+  const x = Math.round((cssW - panelW) / 2);
+  const y = Math.round((cssH - panelH) / 2);
+
+  ctx.fillStyle = COLOR.hud;
+  ctx.fillRect(x, y, panelW, panelH);
+  ctx.strokeStyle = COLOR.hudLine;
+  ctx.lineWidth = 4;
+  ctx.strokeRect(x + 2, y + 2, panelW - 4, panelH - 4);
+
+  let ty = y + 18;
+  setFont(ctx, MARKET_TITLE, true);
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "left";
+  ctx.fillText("Base market", x + 24, ty);
+  ty += MARKET_TITLE + 8;
+  setFont(ctx, MARKET_FONT, true);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText("Credits: " + state.credits, x + 24, ty);
+  ty += MARKET_LINE;
+
+  const note = state.marketNote || "Sell ore from the hold, or buy an upgrade.";
+  const warning = note === "Not enough credits" || note.indexOf("Erase") === 0;
+  if (warning) {
+    ctx.fillStyle = COLOR.hudLine;
+    ctx.fillRect(x + 16, ty - 4, panelW - 32, MARKET_LINE);
+    ctx.fillStyle = "#111111";
+  } else {
+    ctx.fillStyle = "#ffffff";
+  }
+  setFont(ctx, MARKET_FONT, true);
+  ctx.fillText(note, x + 24, ty);
+  ty += MARKET_LINE + 8;
+
+  const footer = "Up or Down to move. W or S also move. Enter chooses. Esc closes.";
+  const listBottom = y + panelH - 24 - MARKET_LINE;
+  setFont(ctx, MARKET_FONT, true);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(footer, x + 24, listBottom + 8);
+
+  const listTop = ty;
+  const room = Math.max(1, Math.floor((listBottom - listTop) / MARKET_LINE));
+  let start = 0;
+  if (rows.length > room) {
+    start = state.marketCursor - Math.floor(room / 2);
+    if (start < 0) start = 0;
+    if (start > rows.length - room) start = rows.length - room;
+  }
+  const maxText = panelW - 48;
+  for (let i = start; i < rows.length && i < start + room; i++) {
+    const selected = i === state.marketCursor;
+    const ry = listTop + (i - start) * MARKET_LINE;
+    const label = selected ? "Selected. " + rows[i].label : rows[i].label;
+    if (selected) {
+      ctx.fillStyle = COLOR.hudLine;
+      ctx.fillRect(x + 16, ry - 2, panelW - 32, MARKET_LINE - 2);
+      ctx.fillStyle = "#111111";
+    } else {
+      ctx.fillStyle = "#ffffff";
+    }
+    let size = MARKET_FONT;
+    setFont(ctx, size, true);
+    while (size > 20 && ctx.measureText(label).width > maxText) {
+      size -= 1;
+      setFont(ctx, size, true);
+    }
+    ctx.fillText(label, x + 24, ry);
+  }
 }

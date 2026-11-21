@@ -38,9 +38,54 @@ export const PAD_TRANSFER_RATE = 25;
 export const SOLAR_RATE = 0.5;
 
 // Later shop upgrades. airDrill lets Left/Right dig while airborne.
+// The market does not sell this yet.
 export const UPGRADES = {
   airDrill: false,
 };
+
+// Game prices, not chemistry. One dug block is one mole.
+// Deeper elements pay more. One fuel-tank trip that makes it home
+// sells for about 100 credits, which is the first upgrade.
+export const MARKET_PRICES = {
+  silicateBlock: 50,
+  Al: 8,
+  Fe: 10,
+  Ca: 12,
+  Na: 15,
+  Mg: 14,
+  K: 18,
+  S: 20,
+  Cl: 22,
+};
+
+// Rank 0 is where a new game starts. The next three ranks are the shop.
+export const FUEL_CELL_RANKS = [
+  { cost: 0, fuel: MAX_FUEL },
+  { cost: 100, fuel: 150 },
+  { cost: 250, fuel: 210 },
+  { cost: 500, fuel: 280 },
+];
+
+export const BASE_STORAGE_RANKS = [
+  { cost: 0, energy: BASE_ENERGY_MAX },
+  { cost: 100, energy: 1000 },
+  { cost: 250, energy: 1500 },
+  { cost: 500, energy: 2100 },
+];
+
+export const SOLAR_RANKS = [
+  { cost: 0, rate: SOLAR_RATE },
+  { cost: 100, rate: 1 },
+  { cost: 250, rate: 1.6 },
+  { cost: 500, rate: 2.5 },
+];
+
+export const SAVE_VERSION = 1;
+export const SAVE_KEY = "assay-pod-save";
+
+export const MARKET_TITLE = 28;
+export const MARKET_FONT = 22;
+export const MARKET_LINE = 32;
 
 export const MESSAGE_TIME = 3;
 // How often the full-hold warning can appear while the player keeps digging.
