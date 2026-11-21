@@ -1,7 +1,7 @@
 // Pod movement, digging, fuel, and the surface pad.
 import {
-  CARGO_MAX,
   DIG_BURN,
+  ROCK_DIG_FUEL_MULT,
   DIG_TIME,
   DOWN_BOOST,
   GRAVITY,
@@ -22,10 +22,12 @@ import {
   SOLAR_RATE,
   UPGRADES,
   MESSAGE_TIME,
+  HOLD_FULL_TOAST_GAP,
+  HOLD_CAPACITY_G,
   SILICATE_PER_ROCK,
   SILICATE_PER_BLOCK,
 } from "./config.js";
-import { elementBySymbol, ELEMENTS, totalCount } from "./data/elements.js";
+import { elementBySymbol, ELEMENTS, holdMass } from "./data/elements.js";
 import {
   generateWorld,
   getTile,
@@ -47,7 +49,7 @@ export function newRun() {
     baseEnergy: BASE_ENERGY_MAX,
     baseEnergyMax: BASE_ENERGY_MAX,
     cargo: {},
-    cargoMax: CARGO_MAX,
+    holdCapacityG: HOLD_CAPACITY_G,
     delivered: {},
     silicate: 0,
     silicateBanked: 0,
@@ -63,6 +65,7 @@ export function newRun() {
     // Symbols the player has identified. A later save can persist this object.
     discovered: {},
     dig: null,
+    holdFullAt: -999,
     message: "Step right onto the gray rock. Hold Down or S to dig.",
     messageT: MESSAGE_TIME,
     particles: [],
@@ -346,8 +349,32 @@ function finishDig(state, tile) {
 }
 
 // True while a single locked cell is being dug. Movement is skipped then.
+function warnHoldFull(state) {
+  if (state.time - state.holdFullAt < HOLD_FULL_TOAST_GAP) return;
+  state.holdFullAt = state.time;
+  note(state, "Hold full - return to base");
+}
+
+// Ore only. Gray rock and hard rock stay diggable; they are not cargo.
+function oreWouldOverflow(state, dir) {
+  if (state.dig && state.dig.dir === dir) return false;
+  const at = cellInDirection(dominantCell(state.player), dir);
+  if (!at) return false;
+  const tile = getTile(state.world, at.tx, at.ty);
+  if (!tile || tile.t !== "ore") return false;
+  const el = elementBySymbol(tile.el);
+  if (!el) return false;
+  return holdMass(state.cargo) + el.molarMass > state.holdCapacityG + 1e-6;
+}
+
 function updateDig(state, keys, dt) {
   const dir = heldDigDir(keys);
+  // Refuse an ore that would not fit. No bite, no dig fuel, no damage.
+  if (dir && oreWouldOverflow(state, dir)) {
+    state.dig = null;
+    warnHoldFull(state);
+    return false;
+  }
   // Up, or no dig key, cancels. An in-progress bite may slide the feet
   // off the floor; that slide should not cancel a dig that started grounded.
   if (!dir) {
@@ -370,14 +397,6 @@ function updateDig(state, keys, dt) {
     state.dig = null;
     return false;
   }
-  if (tile.t === "ore" && totalCount(state.cargo) >= state.cargoMax) {
-    state.message = "Cargo full. Return to the PAD.";
-    state.messageT = Math.max(state.messageT, MESSAGE_TIME);
-    slideToGoal(state);
-    state.drill = dir;
-    return true;
-  }
-
   dig.p += dt / (DIG_TIME[tile.t] || 0.2);
   state.moteAcc += dt;
   if (state.moteAcc >= 0.06) {
@@ -385,12 +404,13 @@ function updateDig(state, keys, dt) {
     spray(state, dig.tx, dig.ty, tile.t, tile.el, 1, 36);
   }
   state.drill = dir;
+  const kind = tile.t;
   if (dig.p < 1) {
     slideToGoal(state);
-    return true;
+    return kind;
   }
   finishDig(state, tile);
-  return true;
+  return kind;
 }
 
 function note(state, text) {
@@ -511,7 +531,10 @@ export function step(state, keys, dt) {
   if (!docked) {
     if ((keys.left || keys.right) && Math.abs(p.vx) > 20) state.fuel -= MOVE_BURN * dt;
     if (keys.up) state.fuel -= THRUST_BURN * dt;
-    if (digging) state.fuel -= DIG_BURN * dt;
+    if (digging) {
+      const mult = digging === "dirt" ? ROCK_DIG_FUEL_MULT : 1;
+      state.fuel -= DIG_BURN * mult * dt;
+    }
   }
 
   // Later slice: open the shop from this dock. Cargo unloads at once.

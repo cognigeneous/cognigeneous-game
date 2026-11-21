@@ -1,6 +1,6 @@
 // Startup, frame loop, and the screen-reader mirror of the HUD.
 import { GAME_TITLE, MAX_FUEL } from "./config.js";
-import { ELEMENTS, elementBySymbol, listHeld } from "./data/elements.js";
+import { ELEMENTS, elementBySymbol, holdMass, listHeld } from "./data/elements.js";
 import { createGame } from "./game.js";
 import { draw } from "./draw.js";
 
@@ -36,8 +36,11 @@ resize();
 function countKey(counts, discovered) {
   return listHeld(counts)
     .map(function (row) {
-      if (discovered && discovered[row.symbol]) return row.symbol + " " + row.count;
-      return "? " + row.count;
+      if (discovered && discovered[row.symbol]) {
+        const grams = Math.round(row.count * row.molarMass * 100) / 100;
+        return row.symbol + " " + row.count + " mol " + grams.toFixed(2) + " g";
+      }
+      return "? " + row.count + " mol";
     })
     .join(", ");
 }
