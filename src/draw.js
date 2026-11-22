@@ -15,7 +15,7 @@ import {
   SURFACE_ROW,
   TILE,
   SOLAR_RATE,
-  HOLD_CAPACITY_G,
+  HOLD_CAPACITY_KG,
   HUD_TITLE,
   HUD_FONT,
   HUD_LINE,
@@ -115,12 +115,12 @@ function drawBedrock(ctx, x, y, sx, sy) {
 
   const depth = y - SURFACE_ROW;
   if (x === 0 && depth > 0 && depth % 10 === 0) {
-    setFont(ctx, 16, true);
+    setFont(ctx, 18, true);
     ctx.fillStyle = COLOR.bedrock;
-    ctx.fillRect(sx + 6, sy + 10, TILE - 12, 22);
+    ctx.fillRect(sx + 1, sy + 9, TILE - 2, 22);
     ctx.fillStyle = COLOR.hazard;
     ctx.textAlign = "center";
-    ctx.fillText(String(depth), sx + TILE / 2, sy + 12);
+    ctx.fillText(String(depth), sx + TILE / 2, sy + 11);
   }
 }
 
@@ -195,7 +195,50 @@ function drawOreMark(ctx, symbol, sx, sy) {
     ctx.fillRect(sx + TILE - 12, sy + 7, 5, 5);
     ctx.fillRect(sx + 7, sy + TILE - 12, 5, 5);
     ctx.fillRect(sx + TILE - 12, sy + TILE - 12, 5, 5);
-  } else {
+  } else if (symbol === "Li") {
+    ctx.fillRect(sx + 5, sy + 8, 4, TILE - 16);
+    ctx.fillRect(sx + TILE - 9, sy + 8, 4, TILE - 16);
+  } else if (symbol === "O") {
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 * i) / 8;
+      ctx.fillRect(cx + Math.cos(angle) * 14 - 2, cy + Math.sin(angle) * 14 - 2, 4, 4);
+    }
+  } else if (symbol === "F") {
+    ctx.moveTo(sx + 8, sy + TILE - 16);
+    ctx.lineTo(cx, sy + TILE - 6);
+    ctx.lineTo(sx + TILE - 8, sy + TILE - 16);
+    ctx.stroke();
+  } else if (symbol === "Zn") {
+    ctx.moveTo(sx + 6, sy + 8);
+    ctx.lineTo(sx + 13, sy + 15);
+    ctx.lineTo(sx + 20, sy + 8);
+    ctx.lineTo(sx + 27, sy + 15);
+    ctx.lineTo(sx + TILE - 6, sy + 8);
+    ctx.stroke();
+  } else if (symbol === "Br") {
+    ctx.fillRect(sx + 8, sy + TILE - 12, 4, 7);
+    ctx.fillRect(sx + 18, sy + TILE - 12, 4, 7);
+    ctx.fillRect(sx + 28, sy + TILE - 12, 4, 7);
+  } else if (symbol === "Ag") {
+    ctx.moveTo(sx + 6, sy + 14);
+    ctx.lineTo(sx + 6, sy + 6);
+    ctx.lineTo(sx + 14, sy + 6);
+    ctx.moveTo(sx + TILE - 14, sy + 6);
+    ctx.lineTo(sx + TILE - 6, sy + 6);
+    ctx.lineTo(sx + TILE - 6, sy + 14);
+    ctx.moveTo(sx + 6, sy + TILE - 14);
+    ctx.lineTo(sx + 6, sy + TILE - 6);
+    ctx.lineTo(sx + 14, sy + TILE - 6);
+    ctx.moveTo(sx + TILE - 14, sy + TILE - 6);
+    ctx.lineTo(sx + TILE - 6, sy + TILE - 6);
+    ctx.lineTo(sx + TILE - 6, sy + TILE - 14);
+    ctx.stroke();
+  } else if (symbol === "I") {
+    for (let i = 0; i < 5; i++) {
+      ctx.fillRect(sx + 6 + i * 6, sy + 6, 3, 3);
+      ctx.fillRect(sx + 6 + i * 6, sy + TILE - 9, 3, 3);
+    }
+  } else if (symbol === "Cl") {
     ctx.moveTo(sx + 7, sy + 7);
     ctx.lineTo(sx + 15, sy + 15);
     ctx.moveTo(sx + TILE - 7, sy + 7);
@@ -463,12 +506,12 @@ function drawCountList(ctx, x, y, counts, maxY, discovered, line) {
     if (y + HUD_FONT > maxY) break;
     const row = rows[i];
     const known = discovered && discovered[row.symbol];
-    const grams = Math.round(row.count * row.molarMass * 100) / 100;
+    const kilos = Math.round(row.count * row.molarMass * 100) / 100;
     ctx.fillStyle = "#ffffff";
     ctx.fillText(
       known
-        ? row.symbol + "  " + row.count + " mol  " + grams.toFixed(2) + " g"
-        : "? " + row.count + " mol",
+        ? row.symbol + "  " + row.count + " kmol  " + kilos.toFixed(2) + " kg"
+        : "? " + row.count + " kmol",
       x,
       y
     );
@@ -518,11 +561,11 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   y += 28;
 
   const cargoG = holdMass(state.cargo);
-  const capacity = state.holdCapacityG || HOLD_CAPACITY_G;
+  const capacity = state.holdCapacityKg || HOLD_CAPACITY_KG;
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
-  ctx.fillText("Cargo: " + cargoG.toFixed(2) + " / " + capacity + " g", left, y);
+  ctx.fillText("Cargo: " + cargoG.toFixed(2) + " / " + capacity + " kg", left, y);
   y += HUD_LINE - 6;
   drawMeter(ctx, left, y, inner, cargoG / capacity, COLOR.cargo);
   y += 28;
