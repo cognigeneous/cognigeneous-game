@@ -41,10 +41,10 @@ function countKey(counts, discovered) {
   return listHeld(counts)
     .map(function (row) {
       if (discovered && discovered[row.symbol]) {
-        const grams = Math.round(row.count * row.molarMass * 100) / 100;
-        return row.symbol + " " + row.count + " mol " + grams.toFixed(2) + " g";
+        const kilos = Math.round(row.count * row.molarMass * 100) / 100;
+        return row.symbol + " " + row.count + " kmol " + kilos.toFixed(2) + " kg";
       }
-      return "? " + row.count + " mol";
+      return "? " + row.count + " kmol";
     })
     .join(", ");
 }

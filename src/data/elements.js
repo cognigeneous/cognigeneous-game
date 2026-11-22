@@ -7,7 +7,9 @@
  * Order and bands follow approximate abundance in Earth's crust, as a
  * play simplification: common elements sit shallower, rarer ones deeper.
  * chance is the per-tile odds inside that band (before a deposit spreads).
- * molarMass is grams per mole, so one dug block is that many grams.
+ * molarMass is kilograms per kilomole. One dug block is 1 kmol,
+ * so the mass added to the hold is this number in kilograms.
+ * Ion charges live in config and are not used while digging.
  */
 export const ELEMENTS = [
   { symbol: "Al", name: "Aluminum", molarMass: 26.98, depthMin: 1, depthMax: 20, chance: 0.045 },
@@ -18,6 +20,13 @@ export const ELEMENTS = [
   { symbol: "K", name: "Potassium", molarMass: 39.10, depthMin: 26, depthMax: 58, chance: 0.026 },
   { symbol: "S", name: "Sulfur", molarMass: 32.06, depthMin: 36, depthMax: 66, chance: 0.024 },
   { symbol: "Cl", name: "Chlorine", molarMass: 35.45, depthMin: 46, depthMax: 70, chance: 0.022 },
+  { symbol: "O", name: "Oxygen", molarMass: 16.00, depthMin: 18, depthMax: 52, chance: 0.028 },
+  { symbol: "Li", name: "Lithium", molarMass: 6.94, depthMin: 24, depthMax: 58, chance: 0.02 },
+  { symbol: "Zn", name: "Zinc", molarMass: 65.38, depthMin: 50, depthMax: 82, chance: 0.016 },
+  { symbol: "F", name: "Fluorine", molarMass: 19.00, depthMin: 56, depthMax: 90, chance: 0.014 },
+  { symbol: "Br", name: "Bromine", molarMass: 79.90, depthMin: 64, depthMax: 100, chance: 0.012 },
+  { symbol: "Ag", name: "Silver", molarMass: 107.87, depthMin: 84, depthMax: 113, chance: 0.008 },
+  { symbol: "I", name: "Iodine", molarMass: 126.90, depthMin: 92, depthMax: 113, chance: 0.007 },
 ];
 
 export function elementBySymbol(symbol) {
@@ -52,10 +61,10 @@ export function totalCount(counts) {
   return n;
 }
 
-/** Grams in the hold. One block of an element is one mole. */
+/** Kilograms in the hold. One block of an element is one kilomole. */
 export function holdMass(counts) {
-  let grams = 0;
+  let kilos = 0;
   const rows = listHeld(counts);
-  for (let i = 0; i < rows.length; i++) grams += rows[i].count * rows[i].molarMass;
-  return Math.round(grams * 100) / 100;
+  for (let i = 0; i < rows.length; i++) kilos += rows[i].count * rows[i].molarMass;
+  return Math.round(kilos * 100) / 100;
 }

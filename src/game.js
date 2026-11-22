@@ -23,7 +23,7 @@ import {
   UPGRADES,
   MESSAGE_TIME,
   HOLD_FULL_TOAST_GAP,
-  HOLD_CAPACITY_G,
+  HOLD_CAPACITY_KG,
   SILICATE_PER_ROCK,
   SILICATE_PER_BLOCK,
 } from "./config.js";
@@ -59,7 +59,7 @@ export function newRun() {
     baseEnergy: BASE_ENERGY_MAX,
     baseEnergyMax: BASE_ENERGY_MAX,
     cargo: {},
-    holdCapacityG: HOLD_CAPACITY_G,
+    holdCapacityKg: HOLD_CAPACITY_KG,
     delivered: {},
     silicate: 0,
     silicateBanked: 0,
@@ -390,7 +390,7 @@ function oreWouldOverflow(state, dir) {
   if (!tile || tile.t !== "ore") return false;
   const el = elementBySymbol(tile.el);
   if (!el) return false;
-  return holdMass(state.cargo) + el.molarMass > state.holdCapacityG + 1e-6;
+  return holdMass(state.cargo) + el.molarMass > state.holdCapacityKg + 1e-6;
 }
 
 function updateDig(state, keys, dt) {

@@ -204,7 +204,7 @@ export function marketRows(state) {
         row.symbol +
         "), " +
         row.count +
-        " mol at " +
+        " kmol at " +
         each +
         " credits each, " +
         total +
