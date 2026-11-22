@@ -8,7 +8,7 @@ Ore identity lives in `src/data/elements.js`, so that list can be reviewed on it
 
 ## How to play
 
-Arrow keys or W A S D. The same keys do both jobs:
+Arrow keys or W A S D. The same keys do both jobs. The sidebar keeps a two-line reminder of them:
 
 - In open space the pod drives and flies freely. It is not locked to the grid.
 - Left, right, or down, held against rock while the pod is on the ground, digs exactly one cell: the cell in that direction from the block the pod overlaps most. The pod slides into line with that cell and sits in its center when the bite finishes. Hard rock (diagonal stripes) takes longer. One bite never clears two cells. Left and right do not dig in the air, and they never dig while Up is held.

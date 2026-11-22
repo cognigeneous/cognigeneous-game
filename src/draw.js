@@ -435,16 +435,32 @@ function drawStranded(ctx, viewW, viewH) {
   ctx.fillText("Press R to restart the run.", viewW / 2, y + 142);
 }
 
-function drawCountList(ctx, x, y, counts, maxY, discovered) {
+function drawMeter(ctx, x, y, w, ratio, fill) {
+  ctx.fillStyle = "#2a2a2a";
+  ctx.fillRect(x, y, w, 22);
+  const span = Math.round(w * clamp(ratio, 0, 1));
+  if (span > 0) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, y, span, 22);
+  }
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, 20);
+}
+
+// Every carried stack is drawn. maxY stops the list only when it would run into the hint.
+function drawCountList(ctx, x, y, counts, maxY, discovered, line) {
   const rows = listHeld(counts);
+  const step = line || HUD_LINE;
   setFont(ctx, HUD_FONT, false);
   if (!rows.length) {
+    if (y + step > maxY) return y;
     ctx.fillStyle = "#ffffff";
     ctx.fillText("none yet", x, y);
-    return y + HUD_LINE;
+    return y + step;
   }
   for (let i = 0; i < rows.length; i++) {
-    if (y + HUD_LINE > maxY) break;
+    if (y + HUD_FONT > maxY) break;
     const row = rows[i];
     const known = discovered && discovered[row.symbol];
     const grams = Math.round(row.count * row.molarMass * 100) / 100;
@@ -456,7 +472,7 @@ function drawCountList(ctx, x, y, counts, maxY, discovered) {
       x,
       y
     );
-    y += HUD_LINE;
+    y += step;
   }
   return y;
 }
@@ -482,6 +498,9 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   ctx.fillText("Map seed " + state.world.seed, left, y);
   y += HUD_LINE;
 
+  const hints = ["Arrows or WASD. Up thrusts.", "Dig on ground. M market. R."];
+  const hintTop = cssH - 12 - hints.length * HUD_LINE;
+
   const fuelN = state.fuel <= 0 ? 0 : Math.ceil(state.fuel - 1e-6);
   const low = state.status === "playing" && state.fuel <= 25;
   setFont(ctx, HUD_FONT, true);
@@ -492,17 +511,11 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
     ctx.fillStyle = COLOR.fuelMid;
     ctx.fillText("Low", left + labelW + 12, y);
   }
-  y += HUD_LINE - 4;
-
-  ctx.fillStyle = "#2a2a2a";
-  ctx.fillRect(left, y, inner, 22);
-  const ratio = clamp(state.fuel / state.maxFuel, 0, 1);
-  ctx.fillStyle = ratio > 0.5 ? COLOR.fuelOk : ratio > 0.25 ? COLOR.fuelMid : COLOR.fuelLow;
-  ctx.fillRect(left, y, Math.round(inner * ratio), 22);
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(left + 1, y + 1, inner - 2, 20);
-  y += 30;
+  y += HUD_LINE - 6;
+  const fuelRatio = clamp(state.fuel / state.maxFuel, 0, 1);
+  const fuelColor = fuelRatio > 0.5 ? COLOR.fuelOk : fuelRatio > 0.25 ? COLOR.fuelMid : COLOR.fuelLow;
+  drawMeter(ctx, left, y, inner, fuelRatio, fuelColor);
+  y += 28;
 
   const cargoG = holdMass(state.cargo);
   const capacity = state.holdCapacityG || HOLD_CAPACITY_G;
@@ -510,76 +523,60 @@ function drawHud(ctx, state, viewW, cssH, hudW) {
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "left";
   ctx.fillText("Cargo: " + cargoG.toFixed(2) + " / " + capacity + " g", left, y);
-  y += HUD_LINE - 4;
-  ctx.fillStyle = "#2a2a2a";
-  ctx.fillRect(left, y, inner, 22);
-  const cargoRatio = clamp(cargoG / capacity, 0, 1);
-  ctx.fillStyle = COLOR.cargo;
-  ctx.fillRect(left, y, Math.round(inner * cargoRatio), 22);
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 2;
-  ctx.strokeRect(left + 1, y + 1, inner - 2, 20);
-  y += 30;
+  y += HUD_LINE - 6;
+  drawMeter(ctx, left, y, inner, cargoG / capacity, COLOR.cargo);
+  y += 28;
 
-  const baseN = Math.max(0, Math.min(state.baseEnergyMax, Math.floor(state.baseEnergy + 1e-4)));
+  const baseMax = state.baseEnergyMax || 1;
+  const baseN = Math.max(0, Math.min(baseMax, Math.floor(state.baseEnergy + 1e-4)));
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
-  ctx.fillText("Base energy: " + baseN + " / " + state.baseEnergyMax, left, y);
-  y += HUD_LINE;
+  ctx.fillText("Base energy: " + baseN + " / " + baseMax, left, y);
+  y += HUD_LINE - 6;
+  drawMeter(ctx, left, y, inner, state.baseEnergy / baseMax, COLOR.energy);
+  y += 28;
+
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
   const solar = typeof state.solarRate === "number" ? state.solarRate : SOLAR_RATE;
   ctx.fillText("Solar +" + formatRate(solar) + "/s", left, y);
-  y += HUD_LINE;
+  y += HUD_LINE - 2;
   ctx.fillText("Credits: " + state.credits, left, y);
-  y += HUD_LINE + 4;
-
-  setFont(ctx, HUD_FONT, true);
-  ctx.fillStyle = "#ffffff";
+  y += HUD_LINE - 2;
   ctx.fillText("Silicate: " + state.silicate.toFixed(2), left, y);
-  y += HUD_LINE;
+  y += HUD_LINE - 2;
   ctx.fillText("Silicate banked: " + state.silicateBanked.toFixed(2), left, y);
-  y += HUD_LINE;
+  y += HUD_LINE - 2;
   ctx.fillText("Silicate blocks: " + state.silicateBlocks, left, y);
-  y += HUD_LINE;
+  y += HUD_LINE - 2;
   ctx.fillText("Depth  " + state.depth + " m", left, y);
-  y += HUD_LINE + 4;
-
-  const controls = [
-    "Controls",
-    "Arrows or W A S D",
-    "Up or W: thrust",
-    "Sides dig when landed",
-    "Down or S: dig",
-    "Up does not dig",
-    "PAD: charge the pod",
-    state.docked ? "M or Enter: market" : "Dock to open market",
-    "R: restart",
-  ];
-  const controlsTop = cssH - 16 - controls.length * HUD_LINE;
-  const listBottom = controlsTop - 8;
+  y += HUD_LINE;
 
   setFont(ctx, HUD_FONT, true);
   ctx.fillStyle = "#ffffff";
   ctx.fillText("In the hold", left, y);
-  y += HUD_LINE;
-  y = drawCountList(ctx, left, y, state.cargo, listBottom, state.discovered);
-  y += 6;
-  if (y + HUD_LINE < listBottom) {
+  y += HUD_LINE - 2;
+  const held = listHeld(state.cargo);
+  const room = hintTop - 8 - y;
+  const holdLine = held.length
+    ? Math.min(HUD_LINE, Math.max(HUD_FONT + 2, Math.floor(room / held.length)))
+    : HUD_LINE;
+  y = drawCountList(ctx, left, y, state.cargo, hintTop - 4, state.discovered, holdLine);
+  y += 4;
+  if (y + HUD_LINE <= hintTop - 4) {
     setFont(ctx, HUD_FONT, true);
     ctx.fillStyle = "#ffffff";
     ctx.fillText("Delivered", left, y);
-    y += HUD_LINE;
-    drawCountList(ctx, left, y, state.delivered, listBottom, state.discovered);
+    y += HUD_LINE - 2;
+    drawCountList(ctx, left, y, state.delivered, hintTop - 4, state.discovered, HUD_LINE - 2);
   }
 
-  let cy = controlsTop;
-  for (let i = 0; i < controls.length; i++) {
-    const head = i === 0;
+  let cy = hintTop;
+  for (let i = 0; i < hints.length; i++) {
     setFont(ctx, HUD_FONT, true);
     ctx.fillStyle = "#ffffff";
     ctx.textAlign = "left";
-    ctx.fillText(controls[i], left, cy);
+    ctx.fillText(hints[i], left, cy);
     cy += HUD_LINE;
   }
 }
