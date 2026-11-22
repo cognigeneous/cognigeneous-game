@@ -147,6 +147,8 @@ export const COLOR = {
   fuelMid: "#F0E442",
   fuelLow: "#D55E00",
   cargo: "#56B4E9",
+  // Reddish purple. Distinct from the green/yellow/orange fuel bar and the sky-blue cargo bar.
+  energy: "#CC79A7",
 };
 
 // Fill and ink for each element. A missing entry still draws the symbol.
