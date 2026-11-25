@@ -3,7 +3,7 @@ export const GAME_TITLE = "Assay Pod";
 
 export const TILE = 40;
 export const MAP_W = 24;
-export const MAP_H = 78;
+export const MAP_H = 120;
 export const SURFACE_ROW = 5;
 export const MAP_SEED = 481516;
 
@@ -19,7 +19,7 @@ export const PLAYER_W = 22;
 export const PLAYER_H = 30;
 
 export const MAX_FUEL = 100;
-export const HOLD_CAPACITY_G = 1000;
+export const HOLD_CAPACITY_KG = 1000;
 
 // Low gravity, strong thrust. Fall speed is capped so landings stay gentle.
 export const GRAVITY = 260;
@@ -43,7 +43,7 @@ export const UPGRADES = {
   airDrill: false,
 };
 
-// Game prices, not chemistry. One dug block is one mole.
+// Game prices, not chemistry. One dug block is one kilomole.
 // Deeper elements pay more. One fuel-tank trip that makes it home
 // sells for about 100 credits, which is the first upgrade.
 export const MARKET_PRICES = {
@@ -56,6 +56,33 @@ export const MARKET_PRICES = {
   K: 18,
   S: 20,
   Cl: 22,
+  Li: 16,
+  O: 12,
+  Zn: 24,
+  F: 26,
+  Br: 30,
+  Ag: 45,
+  I: 40,
+};
+
+// Common ion charges for a later R&D bench. Not used in play yet.
+// Fe is null because that charge varies.
+export const ION_CHARGE = {
+  Al: 3,
+  Fe: null,
+  Ca: 2,
+  Na: 1,
+  Mg: 2,
+  K: 1,
+  S: -2,
+  Cl: -1,
+  Li: 1,
+  O: -2,
+  F: -1,
+  Zn: 2,
+  Br: -1,
+  Ag: 1,
+  I: -1,
 };
 
 // Rank 0 is where a new game starts. The next three ranks are the shop.
@@ -147,6 +174,8 @@ export const COLOR = {
   fuelMid: "#F0E442",
   fuelLow: "#D55E00",
   cargo: "#56B4E9",
+  // Reddish purple. Distinct from the green/yellow/orange fuel bar and the sky-blue cargo bar.
+  energy: "#CC79A7",
 };
 
 // Fill and ink for each element. A missing entry still draws the symbol.
@@ -159,4 +188,12 @@ export const ORE_STYLE = {
   K: { fill: "#E69F00", ink: "#000000" },
   S: { fill: "#CC79A7", ink: "#000000" },
   Cl: { fill: "#111111", ink: "#F0E442" },
+  // Reused Okabe–Ito fills. The mark, not the color, tells these apart.
+  Li: { fill: "#56B4E9", ink: "#000000" },
+  O: { fill: "#F0E442", ink: "#000000" },
+  F: { fill: "#009E73", ink: "#ffffff" },
+  Zn: { fill: "#E69F00", ink: "#000000" },
+  Br: { fill: "#D55E00", ink: "#ffffff" },
+  Ag: { fill: "#0072B2", ink: "#ffffff" },
+  I: { fill: "#CC79A7", ink: "#000000" },
 };
